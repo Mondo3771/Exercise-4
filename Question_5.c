@@ -39,7 +39,7 @@ void count_sort_Par(int a[], int n)
 {
     int i, j, count;
     int *temp = malloc(n * sizeof(int));
-#pragma omp parallel private(j,count) shared(i,n,temp)
+#pragma omp parallel private(j, count) shared(i, n, temp)
     {
 #pragma omp for
         for (i = 0; i < n; i++)
@@ -63,6 +63,40 @@ void count_sort_Par(int a[], int n)
     memcpy(a, temp, n * sizeof(int));
     free(temp);
 }
+void count_sort_Par_task(int a[], int n)
+{
+    int i, j, count;
+    int *temp = malloc(n * sizeof(int));
+#pragma omp parallel private(j, count) shared(i, n, temp)
+    {
+#pragma omp single
+        {
+            for (i = 0; i < n; i++)
+            {
+#pragma omp task
+                {
+                    count = 0;
+                    for (j = 0; j < n; j++)
+                    {
+                        if (a[i] < a[j])
+                        {
+                            count++;
+                        }
+                        else if (a[j] == a[i] && j < i)
+                        {
+                            count++;
+                        }
+                    }
+#pragma omp critical
+                    temp[count] = a[i];
+                }
+            }
+        }
+    }
+    memcpy(a, temp, n * sizeof(int));
+    free(temp);
+}
+
 bool Sorted(int arr[], int n)
 {
     for (int i = 1; i < n; i++)
@@ -80,12 +114,14 @@ int main(int argc, char const *argv[])
     int p = atoi(argv[1]);
     int *arr_serial = (int *)malloc(p * sizeof(int));
     int *arr_par = (int *)malloc(p * sizeof(int));
+    int *arr_par_task = (int *)malloc(p * sizeof(int));
 
     srand(time(0));
     for (int i = 0; i < p; i++)
     {
         arr_serial[i] = rand() % p;
         arr_par[i] = arr_serial[i];
+        arr_par_task[i] = arr_serial[i];
     }
     double start, end;
 
@@ -99,12 +135,25 @@ int main(int argc, char const *argv[])
     start = omp_get_wtime();
     count_sort_Par(arr_par, p);
     end = omp_get_wtime();
+
     double p_time = end - start;
     printf("Time taken By Parallel: %f \n", end - start);
     Sorted(arr_par, p) ? printf("Sorted \n") : printf("UnSorted \n");
 
     printf("Speedup: %f \n", s_time / p_time);
+
+    start = omp_get_wtime();
+    count_sort_Par_task(arr_par_task, p);
+    end = omp_get_wtime();
+
+    p_time = end - start;
+    printf("Time taken By Parallel: %f \n", end - start);
+    Sorted(arr_par_task, p) ? printf("Sorted \n") : printf("UnSorted \n");
+
+    printf("Speedup: %f \n", s_time / p_time);
+
     free(arr_par);
+    free(arr_par_task);
     free(arr_serial);
 
     return 0;
